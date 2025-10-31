@@ -335,39 +335,52 @@ Token Lexer::nextToken() {
             if (pos + 1 < (int)input.length()) {
                 char nextChar = input[pos + 1];
                 if (nextChar >= '0' && nextChar <= '9') {
-                    // 检查前一个非空白字符
+                    // 简化判断：只在明确的情况下认为是负数
                     bool isNegative = false;
-                    if (pos == 0) {
-                        // 在开始位置，是负数
-                        isNegative = true;
-                    } else {
-                        // 往前查找非空白字符
-                        int prevPos = pos - 1;
-                        while (prevPos >= 0) {
-                            char prevC = input[prevPos];
-                            if (prevC == ' ' || prevC == '\t' || prevC == '\n' || 
-                                prevC == '\r' || prevC == '\f' || prevC == '\v') {
-                                prevPos--;
-                            } else {
-                                break;
-                            }
-                        }
-                        if (prevPos < 0) {
-                            // 前面只有空白，是负数
-                            isNegative = true;
+                    
+                    // 查找前一个非空白字符
+                    int prevPos = pos - 1;
+                    while (prevPos >= 0) {
+                        char pc = input[prevPos];
+                        if (pc == ' ' || pc == '\t' || pc == '\n' || pc == '\r' || 
+                            pc == '\f' || pc == '\v') {
+                            prevPos--;
                         } else {
-                            char prevChar = input[prevPos];
-                            // 如果前面是运算符、左括号、分隔符等，则是负数
-                            if (prevChar == '+' || prevChar == '-' || prevChar == '*' || 
-                                prevChar == '/' || prevChar == '%' || prevChar == '(' ||
-                                prevChar == '=' || prevChar == '<' || prevChar == '>' ||
-                                prevChar == '!' || prevChar == '&' || prevChar == '|' ||
-                                prevChar == ';' || prevChar == ',' || prevChar == '{') {
-                                isNegative = true;
-                            }
-                            // 如果前面是字母、数字、下划线、右括号，则-是运算符
+                            break;
                         }
                     }
+                    
+                    if (prevPos < 0) {
+                        // 前面只有空白或开始位置，是负数
+                        isNegative = true;
+                    } else {
+                        char prevChar = input[prevPos];
+                        // 如果前面是左括号、算术运算符、逻辑运算符、分隔符，则是负数
+                        if (prevChar == '(' || prevChar == ';' || prevChar == ',' || 
+                            prevChar == '{' || prevChar == '+' || prevChar == '*' || 
+                            prevChar == '/' || prevChar == '%' || prevChar == '<' || 
+                            prevChar == '>' || prevChar == '!' || prevChar == '&' || 
+                            prevChar == '|') {
+                            isNegative = true;
+                        } else if (prevChar == '=') {
+                            // = 可能是赋值，需要进一步检查
+                            int prev2 = prevPos - 1;
+                            while (prev2 >= 0 && (input[prev2] == ' ' || input[prev2] == '\t' || 
+                                   input[prev2] == '\n' || input[prev2] == '\r')) {
+                                prev2--;
+                            }
+                            if (prev2 < 0 || input[prev2] == '=' || input[prev2] == '+' ||
+                                input[prev2] == '-' || input[prev2] == '*' || input[prev2] == '/' ||
+                                input[prev2] == '%' || input[prev2] == '(' || input[prev2] == '<' ||
+                                input[prev2] == '>' || input[prev2] == '!' || input[prev2] == '&' ||
+                                input[prev2] == '|' || input[prev2] == ';' || input[prev2] == ',' ||
+                                input[prev2] == '{') {
+                                isNegative = true;
+                            }
+                        }
+                        // 如果前面是字母、数字、下划线、右括号，则-是运算符（不是负数）
+                    }
+                    
                     if (isNegative) {
                         return readNumber();
                     }
