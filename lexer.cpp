@@ -49,7 +49,7 @@ void Lexer::skipSpace() {
     // 跳过空白字符
     while (pos < (int)input.length()) {
         char c = getChar();
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v') {
             next();
         } else {
             break;
@@ -83,14 +83,38 @@ void Lexer::skipComments() {
 }
 
 Token Lexer::readNumber() {
-    // 读取数字，包括负数
+    // 读取数字，符合 -?(0|[1-9][0-9]*) 规范
     string num = "";
     
+    // 处理负号
     if (getChar() == '-') {
         num += '-';
         next();
     }
     
+    // 读取第一位数字
+    if (pos >= (int)input.length() || getChar() < '0' || getChar() > '9') {
+        // 如果只有负号没有数字，回退并返回负号运算符
+        if (num == "-") {
+            pos--;
+            tokenIndex--;
+            return Token(MINUS, "-", tokenIndex++);
+        }
+    }
+    
+    char firstDigit = getChar();
+    num += firstDigit;
+    next();
+    
+    // 如果第一位是0，则不能有更多数字（不允许前导零）
+    if (firstDigit == '0') {
+        // 单独的0或-0
+        Token t(INTCONST, num, tokenIndex);
+        tokenIndex++;
+        return t;
+    }
+    
+    // 读取剩余数字（第一位必须是1-9）
     while (pos < (int)input.length()) {
         char c = getChar();
         if (c >= '0' && c <= '9') {
@@ -301,8 +325,54 @@ Token Lexer::nextToken() {
             continue;
         }
         
-        if ((c >= '0' && c <= '9') || (c == '-' && (peek() >= '0' && peek() <= '9'))) {
+        // 处理数字
+        if (c >= '0' && c <= '9') {
             return readNumber();
+        }
+        
+        // 处理负号：如果后面是数字，需要判断是负数还是运算符
+        if (c == '-') {
+            if (pos + 1 < (int)input.length()) {
+                char nextChar = input[pos + 1];
+                if (nextChar >= '0' && nextChar <= '9') {
+                    // 检查前一个非空白字符
+                    bool isNegative = false;
+                    if (pos == 0) {
+                        // 在开始位置，是负数
+                        isNegative = true;
+                    } else {
+                        // 往前查找非空白字符
+                        int prevPos = pos - 1;
+                        while (prevPos >= 0) {
+                            char prevC = input[prevPos];
+                            if (prevC == ' ' || prevC == '\t' || prevC == '\n' || 
+                                prevC == '\r' || prevC == '\f' || prevC == '\v') {
+                                prevPos--;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (prevPos < 0) {
+                            // 前面只有空白，是负数
+                            isNegative = true;
+                        } else {
+                            char prevChar = input[prevPos];
+                            // 如果前面是运算符、左括号、分隔符等，则是负数
+                            if (prevChar == '+' || prevChar == '-' || prevChar == '*' || 
+                                prevChar == '/' || prevChar == '%' || prevChar == '(' ||
+                                prevChar == '=' || prevChar == '<' || prevChar == '>' ||
+                                prevChar == '!' || prevChar == '&' || prevChar == '|' ||
+                                prevChar == ';' || prevChar == ',' || prevChar == '{') {
+                                isNegative = true;
+                            }
+                            // 如果前面是字母、数字、下划线、右括号，则-是运算符
+                        }
+                    }
+                    if (isNegative) {
+                        return readNumber();
+                    }
+                }
+            }
         }
         
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
