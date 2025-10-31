@@ -83,38 +83,27 @@ void Lexer::skipComments() {
 }
 
 Token Lexer::readNumber() {
-    // 读取数字，符合 -?(0|[1-9][0-9]*) 规范
+    // 读取无符号十进制整数，符合 (0|[1-9][0-9]*) 规范
     string num = "";
     
-    // 处理负号
-    if (getChar() == '-') {
-        num += '-';
-        next();
-    }
-    
-    // 读取第一位数字
+    // 第一位必须是数字
     if (pos >= (int)input.length() || getChar() < '0' || getChar() > '9') {
-        // 如果只有负号没有数字，回退并返回负号运算符
-        if (num == "-") {
-            pos--;
-            tokenIndex--;
-            return Token(MINUS, "-", tokenIndex++);
-        }
+        // 不应到达这里，由调用方保证
+        return Token(UNKNOWN, "", tokenIndex++);
     }
     
     char firstDigit = getChar();
     num += firstDigit;
     next();
     
-    // 如果第一位是0，则不能有更多数字（不允许前导零）
+    // 如果第一位是0，则不能再跟数字（防止前导零）
     if (firstDigit == '0') {
-        // 单独的0或-0
         Token t(INTCONST, num, tokenIndex);
         tokenIndex++;
         return t;
     }
     
-    // 读取剩余数字（第一位必须是1-9）
+    // 读取其余数字
     while (pos < (int)input.length()) {
         char c = getChar();
         if (c >= '0' && c <= '9') {
@@ -330,63 +319,8 @@ Token Lexer::nextToken() {
             return readNumber();
         }
         
-        // 处理负号：如果后面是数字，需要判断是负数还是运算符
-        if (c == '-') {
-            if (pos + 1 < (int)input.length()) {
-                char nextChar = input[pos + 1];
-                if (nextChar >= '0' && nextChar <= '9') {
-                    // 简化判断：只在明确的情况下认为是负数
-                    bool isNegative = false;
-                    
-                    // 查找前一个非空白字符
-                    int prevPos = pos - 1;
-                    while (prevPos >= 0) {
-                        char pc = input[prevPos];
-                        if (pc == ' ' || pc == '\t' || pc == '\n' || pc == '\r' || 
-                            pc == '\f' || pc == '\v') {
-                            prevPos--;
-                        } else {
-                            break;
-                        }
-                    }
-                    
-                    if (prevPos < 0) {
-                        // 前面只有空白或开始位置，是负数
-                        isNegative = true;
-                    } else {
-                        char prevChar = input[prevPos];
-                        // 如果前面是左括号、算术运算符、逻辑运算符、分隔符，则是负数
-                        if (prevChar == '(' || prevChar == ';' || prevChar == ',' || 
-                            prevChar == '{' || prevChar == '+' || prevChar == '*' || 
-                            prevChar == '/' || prevChar == '%' || prevChar == '<' || 
-                            prevChar == '>' || prevChar == '!' || prevChar == '&' || 
-                            prevChar == '|') {
-                            isNegative = true;
-                        } else if (prevChar == '=') {
-                            // = 可能是赋值，需要进一步检查
-                            int prev2 = prevPos - 1;
-                            while (prev2 >= 0 && (input[prev2] == ' ' || input[prev2] == '\t' || 
-                                   input[prev2] == '\n' || input[prev2] == '\r')) {
-                                prev2--;
-                            }
-                            if (prev2 < 0 || input[prev2] == '=' || input[prev2] == '+' ||
-                                input[prev2] == '-' || input[prev2] == '*' || input[prev2] == '/' ||
-                                input[prev2] == '%' || input[prev2] == '(' || input[prev2] == '<' ||
-                                input[prev2] == '>' || input[prev2] == '!' || input[prev2] == '&' ||
-                                input[prev2] == '|' || input[prev2] == ';' || input[prev2] == ',' ||
-                                input[prev2] == '{') {
-                                isNegative = true;
-                            }
-                        }
-                        // 如果前面是字母、数字、下划线、右括号，则-是运算符（不是负数）
-                    }
-                    
-                    if (isNegative) {
-                        return readNumber();
-                    }
-                }
-            }
-        }
+        // '-' 始终作为单独的运算符，由 readOp 处理
+        // 任何以 '-' 开始的情况都不在这里解析数字
         
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
             return readId();
